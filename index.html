@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多站連續導線座標計算與管理工具</title>
+    <title>多站連續導線座標計算與管理工具 (VBA 同步版)</title>
     <!-- 引入 SheetJS 用於前端匯出 Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -162,7 +162,7 @@
 <body>
 
 <div class="container">
-    <h1>多站連續導線座標計算與管理工具</h1>
+    <h1>多站連續導線座標計算與管理工具 (VBA 同步版)</h1>
 
     <!-- 起始後視點與設站點 -->
     <div class="section-box">
@@ -246,6 +246,28 @@ document.addEventListener('DOMContentLoaded', function() {
     const exportExcelBtn = document.getElementById('exportExcelBtn');
     const resultArea = document.getElementById('resultArea');
 
+    // 對應 VBA 的 pol 函數（計算方位角與距離）
+    function pol(n1, e1, n2, e2, p) {
+        const PI_VAL = Math.PI;
+        let r = Math.pow(Math.pow(n2 - n1, 2) + Math.pow(e2 - e1, 2), 0.5);
+        if (p === 1) {
+            return r;
+        } else {
+            let az = 0;
+            if (e2 - e1 === 0) {
+                az = (n2 - n1 > 0) ? 0 : PI_VAL;
+            } else {
+                let a = Math.atan((n2 - n1) / (e2 - e1));
+                if (e2 - e1 > 0) {
+                    az = PI_VAL / 2 - a;
+                } else {
+                    az = PI_VAL * 3 / 2 - a;
+                }
+            }
+            return az; // 回傳弳度 (Radians)
+        }
+    }
+
     function addRow(id = '', dist = '', deg = '', min = '', sec = '') {
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
@@ -322,25 +344,30 @@ document.addEventListener('DOMContentLoaded', function() {
         let activeBsE = currentBsE;
         let activeStN = currentStN;
         let activeStE = currentStE;
-        let activeBsId = bsId;
         let activeStId = stId;
 
+        const PI_VAL = Math.PI;
+
         legs.forEach((leg, index) => {
-            // 1. 計算當前站點的後視方位角 Az(ST -> BS)
-            let dn = activeStN - activeBsN;
-            let de = activeStE - activeBsE;
-            let azBsSt = Math.atan2(de, dn) * (180 / Math.PI);
-            if (azBsSt < 0) azBsSt += 360;
-            let azStBs = (azBsSt + 180) % 360;
+            // 1. 利用 pol 函數計算後視方向方位角 Az(ST -> BS) [對應 VBA pol 邏輯]
+            let azimuthBS = pol(activeStN, activeStE, activeBsN, activeBsE, 2);
+            let azimuthST_BS = azimuthBS; // 設站到後視的方位角
 
-            // 2. 加上夾角得到前瞻方位角
+            // 2. 轉換夾角為弳度並與後視方位角相加
             let angleDeg = leg.deg + (leg.min / 60) + (leg.sec / 3600);
-            let fwdAz = (azStBs + angleDeg) % 360;
+            let angleRad = angleDeg * PI_VAL / 180;
+            
+            let fwdAzRad = azimuthST_BS + angleRad;
+            // 保持在 0 ~ 2*PI 之間
+            while (fwdAzRad < 0) fwdAzRad += 2 * PI_VAL;
+            while (fwdAzRad >= 2 * PI_VAL) fwdAzRad -= 2 * PI_VAL;
 
-            // 3. 正算目標點座標
-            let azRad = fwdAz * (Math.PI / 180);
-            let targetN = activeStN + leg.dist * Math.cos(azRad);
-            let targetE = activeStE + leg.dist * Math.sin(azRad);
+            // 3. 透過正算公式計算 ΔN 與 ΔE
+            let dN = leg.dist * Math.cos(fwdAzRad);
+            let dE = leg.dist * Math.sin(fwdAzRad);
+
+            let targetN = activeStN + dN;
+            let targetE = activeStE + dE;
 
             results.push({
                 stationId: activeStId,
@@ -351,13 +378,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 deg: leg.deg,
                 min: leg.min,
                 sec: leg.sec,
-                fwdAz: fwdAz
+                fwdAz: fwdAzRad * 180 / PI_VAL
             });
 
-            // 4. 滾動更新下一站的起算點 (當前設站點變成下站後視點，當前目標點變成下站設站點)
+            // 4. 滾動更新下一站起算點
             activeBsN = activeStN;
             activeBsE = activeStE;
-            activeBsId = activeStId;
 
             activeStN = targetN;
             activeStE = targetE;
@@ -371,7 +397,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const results = runTraverseCalculation();
         if (!results) return;
 
-        let text = `=== 多站連續導線計算結果 ===\n`;
+        let text = `=== 多站連續導線計算結果 (VBA 同步版) ===\n`;
         results.forEach((r, idx) => {
             text += `第 ${idx+1} 站 [設站: ${r.stationId}] → 目標: ${r.targetId.padEnd(6)} | N = ${r.n.toFixed(4)}, E = ${r.e.toFixed(4)} | 邊長: ${r.dist}m | 方位角: ${r.fwdAz.toFixed(2)}°\n`;
         });
@@ -407,7 +433,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const ws = XLSX.utils.aoa_to_sheet(excelRows);
 
         XLSX.utils.book_append_sheet(wb, ws, "連續導線計算表");
-        XLSX.writeFile(wb, `多站連續導線計算表_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.writeFile(wb, `多站連續導線計算表_VBA同步_${new Date().toISOString().slice(0, 10)}.xlsx`);
     });
 });
 </script>
