@@ -3,17 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>設站點與後視點反推座標計算工具</title>
+    <title>導線點座標反推與計算工具</title>
     <!-- 引入 SheetJS 用於前端匯出 Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary-color: #2563eb;
-            --primary-hover: #1d4ed8;
             --success-color: #16a34a;
-            --success-hover: #15803d;
             --danger-color: #dc2626;
-            --danger-hover: #b91c1c;
             --bg-color: #f8fafc;
             --card-bg: #ffffff;
             --border-color: #cbd5e1;
@@ -30,12 +27,12 @@
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1050px;
             margin: 0 auto;
             background-color: var(--card-bg);
             padding: 30px;
             border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
 
         h1 {
@@ -141,40 +138,13 @@
             font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s;
         }
 
-        .btn-primary {
-            background-color: var(--primary-color);
-            color: white;
-            flex: 2;
-        }
-
-        .btn-success {
-            background-color: var(--success-color);
-            color: white;
-            flex: 1.5;
-        }
-
-        .btn-secondary {
-            background-color: #e2e8f0;
-            color: var(--text-color);
-            flex: 1;
-        }
-
-        .btn-danger-outline {
-            background-color: #fff;
-            color: var(--danger-color);
-            border: 1px solid var(--danger-color);
-            flex: 1;
-        }
-
-        .btn-delete {
-            background-color: var(--danger-color);
-            color: white;
-            padding: 6px 12px;
-            font-size: 0.85rem;
-        }
+        .btn-primary { background-color: var(--primary-color); color: white; flex: 2; }
+        .btn-success { background-color: var(--success-color); color: white; flex: 1.5; }
+        .btn-secondary { background-color: #e2e8f0; color: var(--text-color); flex: 1; }
+        .btn-danger-outline { background-color: #fff; color: var(--danger-color); border: 1px solid var(--danger-color); flex: 1; }
+        .btn-delete { background-color: var(--danger-color); color: white; padding: 6px 12px; font-size: 0.85rem; }
 
         #resultArea {
             background-color: #f8fafc;
@@ -192,75 +162,72 @@
 <body>
 
 <div class="container">
-    <h1>設站點與後視點反推座標計算工具</h1>
+    <h1>導線點座標反推與計算工具</h1>
 
-    <!-- 設站點與後視點條件設定 -->
+    <!-- 已知後視點與設站點 -->
     <div class="section-box">
-        <h3>📍 1. 設站與後視已知條件</h3>
+        <h3>📍 已知起算點資料 (後視點與設站點)</h3>
         <div class="grid-2">
             <div class="form-group">
-                <label>後視點名稱 (ID):</label>
+                <label>後視點 點號 (ID):</label>
                 <input type="text" id="bsId" value="YY17A">
             </div>
             <div class="form-group">
-                <label>設站點名稱 (ID):</label>
+                <label>設站點 點號 (ID):</label>
                 <input type="text" id="stId" value="YY18A">
             </div>
             <div class="form-group">
-                <label>後視點縱座標 (N):</label>
+                <label>後視點 縱座標 (N):</label>
                 <input type="number" step="any" id="bsN" value="2764584">
             </div>
             <div class="form-group">
-                <label>設站點縱座標 (N):</label>
+                <label>設站點 縱座標 (N):</label>
                 <input type="number" step="any" id="stN" value="2765005">
             </div>
             <div class="form-group">
-                <label>後視點橫座標 (E):</label>
+                <label>後視點 橫座標 (E):</label>
                 <input type="number" step="any" id="bsE" value="306320.654">
             </div>
             <div class="form-group">
-                <label>設站點橫座標 (E):</label>
+                <label>設站點 橫座標 (E):</label>
                 <input type="number" step="any" id="stE" value="307489.712">
             </div>
         </div>
-        <div style="font-size: 0.85rem; color: #64748b; margin-top: 5px;">
-            💡 系統會自動透過「後視點 ➔ 設站點」計算出第一段出發方位角，並依下方表格的夾角與邊長依序推算前瞻點座標。
-        </div>
     </div>
 
-    <!-- 導線點與夾角輸入表格 -->
+    <!-- 前瞻導線點與夾角輸入 -->
     <div class="section-box">
-        <h3>📊 2. 前瞻導線點資料與夾角輸入</h3>
+        <h3>📊 前瞻導線點資料與夾角輸入 (對應 Excel 格式)</h3>
         <div class="table-container">
             <table id="traverseTable">
                 <thead>
                     <tr>
                         <th rowspan="2" style="width: 8%;">項次</th>
-                        <th rowspan="2" style="width: 20%;">點號 (ID)</th>
-                        <th rowspan="2" style="width: 22%;">邊長 (m)</th>
-                        <th style="width: 38%;">夾角 (度分秒)</th>
+                        <th rowspan="2" style="width: 18%;">點號 (ID)</th>
+                        <th rowspan="2" style="width: 20%;">邊長 (m)</th>
+                        <th style="width: 42%;">夾角 (度分秒)</th>
                         <th rowspan="2" style="width: 12%;">操作</th>
                     </tr>
                     <tr>
                         <th style="padding: 4px;">
                             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 0.8rem; color: #475569;">
-                                <span>度 (°)</span><span>分 (')</span><span>秒 (")</span>
+                                <span>°</span><span>'</span><span>"</span>
                             </div>
                         </th>
                     </tr>
                 </thead>
                 <tbody>
-                    <!-- 動態生成列 -->
+                    <!-- 動態生成 -->
                 </tbody>
             </table>
         </div>
-        <button type="button" id="addRowBtn" class="btn-secondary">＋ 新增導線點</button>
+        <button type="button" id="addRowBtn" class="btn-secondary">＋ 新增前瞻導線點</button>
     </div>
 
     <div class="btn-group">
         <button type="button" id="clearBtn" class="btn-danger-outline">🗑️ 清空表格</button>
-        <button type="button" id="calculateBtn" class="btn-primary">開始反推計算座標 (N, E)</button>
-        <button type="button" id="exportExcelBtn" class="btn-success">📊 匯出完整計算表 Excel</button>
+        <button type="button" id="calculateBtn" class="btn-primary">計算下一個點座標 (N, E)</button>
+        <button type="button" id="exportExcelBtn" class="btn-success">📊 匯出 Excel 格式報表</button>
     </div>
 
     <div id="resultArea"></div>
@@ -307,7 +274,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 預帶入您剛剛截圖的範例資料
+    // 預設帶入您截圖中的範例資料
     addRow('YY19', '2220', '22', '0', '55');
 
     addRowBtn.addEventListener('click', () => addRow());
@@ -320,7 +287,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    function performForwardCalculation() {
+    function performCalculation() {
         const bsId = document.getElementById('bsId').value.trim() || 'BS';
         const stId = document.getElementById('stId').value.trim() || 'ST';
         const bsN = parseFloat(document.getElementById('bsN').value);
@@ -329,10 +296,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const stE = parseFloat(document.getElementById('stE').value);
 
         if (isNaN(bsN) || isNaN(bsE) || isNaN(stN) || isNaN(stE)) {
-            alert('請輸入完整的後視點與設站點座標！');
+            alert('請完整輸入後視點與設站點座標！');
             return null;
         }
 
+        // 計算後視到設站方位角
         let dn = stN - bsN;
         let de = stE - bsE;
         let rad = Math.atan2(de, dn);
@@ -350,7 +318,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const deg = parseFloat(row.querySelector('.input-deg').value) || 0;
             const min = parseFloat(row.querySelector('.input-min').value) || 0;
             const sec = parseFloat(row.querySelector('.input-sec').value) || 0;
-            
             tableData.push({ id, dist, deg, min, sec });
         });
 
@@ -391,22 +358,19 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        return {
-            bsId, stId, bsN, bsE, stN, stE, results: calculatedResults
-        };
+        return { bsId, stId, bsN, bsE, stN, stE, results: calculatedResults };
     }
 
     calculateBtn.addEventListener('click', function() {
-        const data = performForwardCalculation();
+        const data = performCalculation();
         if (!data) return;
 
-        let text = `=== 設站與後視反推計算結果 ===\n`;
-        text += `後視點 ${data.bsId}：N = ${data.bsN}, E = ${data.bsE}\n`;
-        text += `設站點 ${data.stId}：N = ${data.stN}, E = ${data.stE}\n\n`;
+        let text = `=== 座標計算結果 (完全對應 Excel 格式) ===\n`;
+        text += `點號: ${data.bsId.padEnd(8)} | 縱座標(N): ${data.bsN} | 橫座標(E): ${data.bsE}\n`;
+        text += `點號: ${data.stId.padEnd(8)} | 縱座標(N): ${data.stN} | 橫座標(E): ${data.stE} (設站點)\n`;
 
         data.results.forEach(r => {
-            text += `目標點: ${r.id} | 邊長: ${r.dist || 0}m | 夾角: ${r.deg}°${r.min}'${r.sec}"\n`;
-            text += `  ➔ 推算座標：N = ${r.n.toFixed(3)}, E = ${r.e.toFixed(3)}\n\n`;
+            text += `點號: ${r.id.padEnd(8)} | 縱座標(N): ${r.n.toFixed(3)} | 橫座標(E): ${r.e.toFixed(3)} | 邊長: ${r.dist || 0}m | 夾角: ${r.deg}°${r.min}'${r.sec}"\n`;
         });
 
         resultArea.style.display = 'block';
@@ -415,17 +379,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     exportExcelBtn.addEventListener('click', function() {
-        const data = performForwardCalculation();
+        const data = performCalculation();
         if (!data) return;
 
+        // 完全對應您的 Excel 欄位結構
         const excelRows = [
             ["點號 (ID)", "縱座標 (N)", "橫座標 (E)", "邊長 (m)", "夾角 (度分秒)", "", ""],
             ["", "", "", "", "°", "'", "\""]
         ];
 
+        // 後視點
         excelRows.push([data.bsId, data.bsN, data.bsE, "", "", "", ""]);
         
-        const firstDist = data.results.length > 0 && data.results[0].dist !== "" ? data.results[0].dist : "";
+        // 設站點 (帶入第一筆的邊長與夾角)
+        const firstDist = data.results.length > 0 && !isNaN(data.results[0].dist) ? data.results[0].dist : "";
         const firstAng = data.results.length > 0 ? data.results[0] : null;
         
         excelRows.push([
@@ -438,13 +405,14 @@ document.addEventListener('DOMContentLoaded', function() {
             firstAng ? firstAng.sec : ""
         ]);
 
+        // 後續計算出的前瞻點
         for (let i = 1; i < data.results.length; i++) {
             let r = data.results[i];
             excelRows.push([
                 r.id, 
                 Number(r.n.toFixed(3)), 
                 Number(r.e.toFixed(3)), 
-                r.dist !== "" ? Number(r.dist) : "", 
+                !isNaN(r.dist) ? r.dist : "", 
                 r.deg !== "" ? r.deg : "", 
                 r.min !== "" ? r.min : "", 
                 r.sec !== "" ? r.sec : ""
@@ -458,8 +426,8 @@ document.addEventListener('DOMContentLoaded', function() {
             { s: { r: 0, c: 4 }, e: { r: 0, c: 6 } }
         ];
 
-        XLSX.utils.book_append_sheet(wb, ws, "設站反推計算表");
-        XLSX.writeFile(wb, `設站反推計算表_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "導線計算表");
+        XLSX.writeFile(wb, `導線座標計算表_${new Date().toISOString().slice(0, 10)}.xlsx`);
     });
 });
 </script>
