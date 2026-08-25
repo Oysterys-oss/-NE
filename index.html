@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多站連續導線座標計算與管理工具 (VBA 同步版)</title>
+    <title>多站連續導線座標計算與管理工具 (度分秒同步版)</title>
     <!-- 引入 SheetJS 用於前端匯出 Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -162,7 +162,7 @@
 <body>
 
 <div class="container">
-    <h1>多站連續導線座標計算與管理工具 (VBA 同步版)</h1>
+    <h1>多站連續導線座標計算與管理工具</h1>
 
     <!-- 起始後視點與設站點 -->
     <div class="section-box">
@@ -246,7 +246,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const exportExcelBtn = document.getElementById('exportExcelBtn');
     const resultArea = document.getElementById('resultArea');
 
-    // 對應 VBA 的 pol 函數（計算方位角與距離）
+    // 輔助函數：將十進位角度轉為度-分-秒格式字串
+    function degToDMS(degDecimal) {
+        let d = Math.floor(degDecimal);
+        let remainderMin = (degDecimal - d) * 60;
+        let m = Math.floor(remainderMin);
+        let s = (remainderMin - m) * 60;
+        return `${d}° ${String(m).padStart(2, '0')}' ${s.toFixed(2)}''`;
+    }
+
+    // 對應 VBA 的 pol 函數
     function pol(n1, e1, n2, e2, p) {
         const PI_VAL = Math.PI;
         let r = Math.pow(Math.pow(n2 - n1, 2) + Math.pow(e2 - e1, 2), 0.5);
@@ -264,7 +273,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     az = PI_VAL * 3 / 2 - a;
                 }
             }
-            return az; 
+            return az;
         }
     }
 
@@ -300,8 +309,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 預設帶入第一站測點範例（方位角 258.60° 即 258度 36分 00秒）
-    addRow('Y254', '62.1103', '258', '36', '0');
+    // 預設帶入第一筆測點
+    addRow('Y254', '155.193', '289', '57', '48.4');
 
     addRowBtn.addEventListener('click', () => addRow());
 
@@ -350,7 +359,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         legs.forEach((leg, index) => {
             let azimuthBS = pol(activeStN, activeStE, activeBsN, activeBsE, 2);
-            let azimuthST_BS = azimuthBS; 
+            let azimuthST_BS = azimuthBS;
 
             let angleDeg = leg.deg + (leg.min / 60) + (leg.sec / 3600);
             let angleRad = angleDeg * PI_VAL / 180;
@@ -365,6 +374,8 @@ document.addEventListener('DOMContentLoaded', function() {
             let targetN = activeStN + dN;
             let targetE = activeStE + dE;
 
+            let fwdAzDeg = fwdAzRad * 180 / PI_VAL;
+
             results.push({
                 stationId: activeStId,
                 targetId: leg.id,
@@ -374,7 +385,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 deg: leg.deg,
                 min: leg.min,
                 sec: leg.sec,
-                fwdAz: fwdAzRad * 180 / PI_VAL
+                fwdAzDeg: fwdAzDeg,
+                fwdAzDMS: degToDMS(fwdAzDeg)
             });
 
             activeBsN = activeStN;
@@ -392,9 +404,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const results = runTraverseCalculation();
         if (!results) return;
 
-        let text = `=== 多站連續導線計算結果 (VBA 同步版) ===\n`;
+        let text = `=== 多站連續導線計算結果 (含度分秒方位角) ===\n`;
         results.forEach((r, idx) => {
-            text += `第 ${idx+1} 站 [設站: ${r.stationId}] → 目標: ${r.targetId.padEnd(6)} | N = ${r.n.toFixed(4)}, E = ${r.e.toFixed(4)} | 邊長: ${r.dist}m | 方位角: ${r.fwdAz.toFixed(2)}°\n`;
+            text += `第 ${idx+1} 站 [設站: ${r.stationId}] → 目標: ${r.targetId.padEnd(6)} | 邊長: ${r.dist}m | 方位角: ${r.fwdAzDMS} | N = ${r.n.toFixed(4)}, E = ${r.e.toFixed(4)}\n`;
         });
 
         resultArea.style.display = 'block';
@@ -407,7 +419,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!results) return;
 
         const excelRows = [
-            ["項次", "設站點 (ST)", "目標點 (ID)", "縱座標 (N)", "橫座標 (E)", "邊長 (m)", "夾角 (°)", "夾角 (')", "夾角 (\")"]
+            ["項次", "設站點 (ST)", "目標點 (ID)", "縱座標 (N)", "橫座標 (E)", "邊長 (m)", "夾角 (°)", "夾角 (')", "夾角 (\")", "方位角 (DMS)"]
         ];
 
         results.forEach((r, idx) => {
@@ -420,7 +432,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 r.dist,
                 r.deg,
                 r.min,
-                r.sec
+                r.sec,
+                r.fwdAzDMS
             ]);
         });
 
@@ -428,7 +441,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const ws = XLSX.utils.aoa_to_sheet(excelRows);
 
         XLSX.utils.book_append_sheet(wb, ws, "連續導線計算表");
-        XLSX.writeFile(wb, `多站連續導線計算表_VBA同步_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.writeFile(wb, `多站連續導線計算表_${new Date().toISOString().slice(0, 10)}.xlsx`);
     });
 });
 </script>
