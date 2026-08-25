@@ -27,7 +27,7 @@
         }
 
         .container {
-            max-width: 1050px;
+            max-width: 1100px;
             margin: 0 auto;
             background-color: var(--card-bg);
             padding: 30px;
@@ -124,6 +124,15 @@
             padding: 6px 4px;
         }
 
+        .coord-display {
+            font-family: monospace;
+            font-weight: 600;
+            color: #047857;
+            background-color: #ecfdf5;
+            padding: 6px;
+            border-radius: 4px;
+        }
+
         .btn-group {
             display: flex;
             gap: 10px;
@@ -145,18 +154,6 @@
         .btn-secondary { background-color: #e2e8f0; color: var(--text-color); flex: 1; }
         .btn-danger-outline { background-color: #fff; color: var(--danger-color); border: 1px solid var(--danger-color); flex: 1; }
         .btn-delete { background-color: var(--danger-color); color: white; padding: 6px 12px; font-size: 0.85rem; }
-
-        #resultArea {
-            background-color: #f8fafc;
-            border: 1px solid var(--border-color);
-            border-left: 4px solid var(--primary-color);
-            padding: 20px;
-            border-radius: 6px;
-            white-space: pre-wrap;
-            font-family: monospace;
-            font-size: 0.95rem;
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -197,20 +194,22 @@
 
     <!-- 前瞻導線點與夾角輸入 -->
     <div class="section-box">
-        <h3>📊 前瞻導線點資料與夾角輸入 (對應 Excel 格式)</h3>
+        <h3>📊 前瞻導線點資料與座標即時預覽</h3>
         <div class="table-container">
             <table id="traverseTable">
                 <thead>
                     <tr>
-                        <th rowspan="2" style="width: 8%;">項次</th>
-                        <th rowspan="2" style="width: 18%;">點號 (ID)</th>
-                        <th rowspan="2" style="width: 20%;">邊長 (m)</th>
-                        <th style="width: 42%;">夾角 (度分秒)</th>
-                        <th rowspan="2" style="width: 12%;">操作</th>
+                        <th rowspan="2" style="width: 6%;">項次</th>
+                        <th rowspan="2" style="width: 14%;">點號 (ID)</th>
+                        <th rowspan="2" style="width: 18%;">縱座標 (N)</th>
+                        <th rowspan="2" style="width: 18%;">橫座標 (E)</th>
+                        <th rowspan="2" style="width: 16%;">邊長 (m)</th>
+                        <th style="width: 22%;">夾角 (度分秒)</th>
+                        <th rowspan="2" style="width: 6%;">操作</th>
                     </tr>
                     <tr>
                         <th style="padding: 4px;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 0.8rem; color: #475569;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 0.75rem; color: #475569;">
                                 <span>°</span><span>'</span><span>"</span>
                             </div>
                         </th>
@@ -226,11 +225,9 @@
 
     <div class="btn-group">
         <button type="button" id="clearBtn" class="btn-danger-outline">🗑️ 清空表格</button>
-        <button type="button" id="calculateBtn" class="btn-primary">計算下一個點座標 (N, E)</button>
+        <button type="button" id="calculateBtn" class="btn-primary">計算並顯示所有點座標 (N, E)</button>
         <button type="button" id="exportExcelBtn" class="btn-success">📊 匯出 Excel 格式報表</button>
     </div>
-
-    <div id="resultArea"></div>
 </div>
 
 <script>
@@ -240,13 +237,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const clearBtn = document.getElementById('clearBtn');
     const calculateBtn = document.getElementById('calculateBtn');
     const exportExcelBtn = document.getElementById('exportExcelBtn');
-    const resultArea = document.getElementById('resultArea');
 
-    function addRow(id = '', dist = '', deg = '', min = '', sec = '') {
+    function addRow(id = '', dist = '', deg = '', min = '', sec = '', nVal = '', eVal = '') {
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
             <td class="row-index"></td>
             <td><input type="text" class="input-id" value="${id}" placeholder="例: YY19"></td>
+            <td><div class="coord-display span-n">${nVal ? Number(nVal).toFixed(3) : '-'}</div></td>
+            <td><div class="coord-display span-e">${eVal ? Number(eVal).toFixed(3) : '-'}</div></td>
             <td><input type="number" step="any" class="input-dist" value="${dist}" placeholder="邊長(m)"></td>
             <td>
                 <div class="angle-inputs">
@@ -274,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 預設帶入您截圖中的範例資料
+    // 預設帶入範例資料
     addRow('YY19', '2220', '22', '0', '55');
 
     addRowBtn.addEventListener('click', () => addRow());
@@ -283,13 +281,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (confirm('確定清空所有資料嗎？')) {
             tbody.innerHTML = '';
             addRow();
-            resultArea.style.display = 'none';
         }
     });
 
     function performCalculation() {
-        const bsId = document.getElementById('bsId').value.trim() || 'BS';
-        const stId = document.getElementById('stId').value.trim() || 'ST';
         const bsN = parseFloat(document.getElementById('bsN').value);
         const bsE = parseFloat(document.getElementById('bsE').value);
         const stN = parseFloat(document.getElementById('stN').value);
@@ -300,7 +295,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return null;
         }
 
-        // 計算後視到設站方位角
         let dn = stN - bsN;
         let de = stE - bsE;
         let rad = Math.atan2(de, dn);
@@ -312,13 +306,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const rows = tbody.querySelectorAll('tr');
         let tableData = [];
-        rows.forEach((row, idx) => {
-            const id = row.querySelector('.input-id').value.trim() || `P${idx+1}`;
+        rows.forEach((row) => {
+            const id = row.querySelector('.input-id').value.trim();
             const dist = parseFloat(row.querySelector('.input-dist').value);
             const deg = parseFloat(row.querySelector('.input-deg').value) || 0;
             const min = parseFloat(row.querySelector('.input-min').value) || 0;
             const sec = parseFloat(row.querySelector('.input-sec').value) || 0;
-            tableData.push({ id, dist, deg, min, sec });
+            tableData.push({ rowElement: row, id, dist, deg, min, sec });
         });
 
         if (tableData.length === 0) return null;
@@ -338,8 +332,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 currE += dist * Math.sin(azRad);
             }
 
+            // 更新網頁表格中的 N、E 顯示
+            item.rowElement.querySelector('.span-n').textContent = currN.toFixed(3);
+            item.rowElement.querySelector('.span-e').textContent = currE.toFixed(3);
+
             calculatedResults.push({
-                id: item.id,
+                id: item.id || `P${i+1}`,
                 n: currN,
                 e: currE,
                 dist: item.dist,
@@ -358,56 +356,50 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        return { bsId, stId, bsN, bsE, stN, stE, results: calculatedResults };
+        return calculatedResults;
     }
 
     calculateBtn.addEventListener('click', function() {
-        const data = performCalculation();
-        if (!data) return;
-
-        let text = `=== 座標計算結果 (完全對應 Excel 格式) ===\n`;
-        text += `點號: ${data.bsId.padEnd(8)} | 縱座標(N): ${data.bsN} | 橫座標(E): ${data.bsE}\n`;
-        text += `點號: ${data.stId.padEnd(8)} | 縱座標(N): ${data.stN} | 橫座標(E): ${data.stE} (設站點)\n`;
-
-        data.results.forEach(r => {
-            text += `點號: ${r.id.padEnd(8)} | 縱座標(N): ${r.n.toFixed(3)} | 橫座標(E): ${r.e.toFixed(3)} | 邊長: ${r.dist || 0}m | 夾角: ${r.deg}°${r.min}'${r.sec}"\n`;
-        });
-
-        resultArea.style.display = 'block';
-        resultArea.textContent = text;
-        resultArea.scrollIntoView({ behavior: 'smooth' });
+        const results = performCalculation();
+        if (results) {
+            alert('座標計算完成，已直接填入表格欄位中！');
+        }
     });
 
     exportExcelBtn.addEventListener('click', function() {
-        const data = performCalculation();
-        if (!data) return;
+        const bsId = document.getElementById('bsId').value.trim() || 'BS';
+        const stId = document.getElementById('stId').value.trim() || 'ST';
+        const bsN = parseFloat(document.getElementById('bsN').value);
+        const bsE = parseFloat(document.getElementById('bsE').value);
+        const stN = parseFloat(document.getElementById('stN').value);
+        const stE = parseFloat(document.getElementById('stE').value);
 
-        // 完全對應您的 Excel 欄位結構
+        const results = performCalculation();
+        if (!results) return;
+
         const excelRows = [
             ["點號 (ID)", "縱座標 (N)", "橫座標 (E)", "邊長 (m)", "夾角 (度分秒)", "", ""],
             ["", "", "", "", "°", "'", "\""]
         ];
 
         // 後視點
-        excelRows.push([data.bsId, data.bsN, data.bsE, "", "", "", ""]);
+        excelRows.push([bsId, bsN, bsE, "", "", "", ""]);
         
-        // 設站點 (帶入第一筆的邊長與夾角)
-        const firstDist = data.results.length > 0 && !isNaN(data.results[0].dist) ? data.results[0].dist : "";
-        const firstAng = data.results.length > 0 ? data.results[0] : null;
-        
+        // 設站點
+        const firstItem = results.length > 0 ? results[0] : null;
         excelRows.push([
-            data.stId, 
-            Number(data.stN.toFixed(3)), 
-            Number(data.stE.toFixed(3)), 
-            firstDist, 
-            firstAng ? firstAng.deg : "", 
-            firstAng ? firstAng.min : "", 
-            firstAng ? firstAng.sec : ""
+            stId, 
+            Number(stN.toFixed(3)), 
+            Number(stE.toFixed(3)), 
+            firstItem && !isNaN(firstItem.dist) ? firstItem.dist : "", 
+            firstItem ? firstItem.deg : "", 
+            firstItem ? firstItem.min : "", 
+            firstItem ? firstItem.sec : ""
         ]);
 
-        // 後續計算出的前瞻點
-        for (let i = 1; i < data.results.length; i++) {
-            let r = data.results[i];
+        // 前瞻點
+        for (let i = 1; i < results.length; i++) {
+            let r = results[i];
             excelRows.push([
                 r.id, 
                 Number(r.n.toFixed(3)), 
