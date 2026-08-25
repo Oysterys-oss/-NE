@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>導線點座標反推與計算工具</title>
+    <title>導線點座標正算與夾角計算工具</title>
     <!-- 引入 SheetJS 用於前端匯出 Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -162,7 +162,7 @@
 <body>
 
 <div class="container">
-    <h1>導線點座標反推與計算工具</h1>
+    <h1>導線點座標正算與夾角計算工具</h1>
 
     <!-- 已知後視點與設站點 -->
     <div class="section-box">
@@ -197,7 +197,7 @@
 
     <!-- 前瞻導線點與夾角輸入 -->
     <div class="section-box">
-        <h3>📊 前瞻導線點資料與方位角輸入 (對應 Excel 格式)</h3>
+        <h3>📊 前瞻導線點資料與夾角輸入 (轉角法)</h3>
         <div class="table-container">
             <table id="traverseTable">
                 <thead>
@@ -205,7 +205,7 @@
                         <th rowspan="2" style="width: 8%;">項次</th>
                         <th rowspan="2" style="width: 18%;">點號 (ID)</th>
                         <th rowspan="2" style="width: 20%;">邊長 (m)</th>
-                        <th style="width: 42%;">方位角/夾角 (度分秒)</th>
+                        <th style="width: 42%;">夾角 (度分秒)</th>
                         <th rowspan="2" style="width: 12%;">操作</th>
                     </tr>
                     <tr>
@@ -300,6 +300,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return null;
         }
 
+        // 1. 計算後視方向到設站點的方位角 Az(BS -> ST)
+        const dnBsSt = stN - bsN;
+        const deBsSt = stE - bsE;
+        let azBsSt = Math.atan2(deBsSt, dnBsSt) * (180 / Math.PI);
+        if (azBsSt < 0) azBsSt += 360;
+
+        // 2. 計算後視方位角 Az(ST -> BS) = Az(BS -> ST) + 180°
+        let azStBs = azBsSt + 180;
+        if (azStBs >= 360) azStBs -= 360;
+
         const rows = tbody.querySelectorAll('tr');
         let tableData = [];
         rows.forEach((row, idx) => {
@@ -315,14 +325,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tableData.length === 0) return null;
 
         let calculatedResults = [];
+        let currentAzimuth = azStBs;
 
         tableData.forEach(item => {
             const dist = isNaN(item.dist) ? 0 : item.dist;
-            // 直接將輸入的度分秒轉換為方位角 (Azimuth)
-            const azimuthDeg = item.deg + (item.min / 60) + (item.sec / 3600);
-            const azRad = azimuthDeg * (Math.PI / 180);
+            const angleDeg = item.deg + (item.min / 60) + (item.sec / 3600);
+            
+            // 前瞻方位角 = 後視方位角 + 夾角(轉角)
+            currentAzimuth = (currentAzimuth + angleDeg) % 360;
+            if (currentAzimuth < 0) currentAzimuth += 360;
 
-            // 以設站點為基點，加上方向與距離正算目標點座標
+            const azRad = currentAzimuth * (Math.PI / 180);
             const n = stN + dist * Math.cos(azRad);
             const e = stE + dist * Math.sin(azRad);
 
@@ -333,7 +346,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 dist: item.dist,
                 deg: item.deg,
                 min: item.min,
-                sec: item.sec
+                sec: item.sec,
+                fwdAz: currentAzimuth
             });
         });
 
@@ -349,7 +363,7 @@ document.addEventListener('DOMContentLoaded', function() {
         text += `設站點: ${data.stId.padEnd(6)} | N = ${data.stN}, E = ${data.stE}\n`;
 
         data.results.forEach(r => {
-            text += `目標點: ${r.id.padEnd(6)} | N = ${r.n.toFixed(3)}, E = ${r.e.toFixed(3)} | 邊長: ${r.dist}m | 方位角: ${r.deg}°${r.min}'${r.sec}"\n`;
+            text += `目標點: ${r.id.padEnd(6)} | N = ${r.n.toFixed(4)}, E = ${r.e.toFixed(4)} | 邊長: ${r.dist}m | 夾角: ${r.deg}°${r.min}'${r.sec}"\n`;
         });
 
         resultArea.style.display = 'block';
@@ -366,30 +380,27 @@ document.addEventListener('DOMContentLoaded', function() {
             ["", "", "", "", "°", "'", "\""]
         ];
 
-        // 1. 後視點
         excelRows.push([data.bsId, data.bsN, data.bsE, "", "", "", ""]);
         
-        // 2. 設站點 (將第一筆的邊長與方位角放在這列)
         const firstItem = data.results.length > 0 ? data.results[0] : null;
         excelRows.push([
             data.stId, 
-            Number(data.stN.toFixed(3)), 
-            Number(data.stE.toFixed(3)), 
+            Number(data.stN.toFixed(4)), 
+            Number(data.stE.toFixed(4)), 
             firstItem ? firstItem.dist : "", 
             firstItem ? firstItem.deg : "", 
             firstItem ? firstItem.min : "", 
             firstItem ? firstItem.sec : ""
         ]);
 
-        // 3. 前瞻點
         for (let i = 0; i < data.results.length; i++) {
             let r = data.results[i];
             let nextItem = (i < data.results.length - 1) ? data.results[i + 1] : null;
 
             excelRows.push([
                 r.id, 
-                Number(r.n.toFixed(3)), 
-                Number(r.e.toFixed(3)), 
+                Number(r.n.toFixed(4)), 
+                Number(r.e.toFixed(4)), 
                 nextItem ? nextItem.dist : "", 
                 nextItem ? nextItem.deg : "", 
                 nextItem ? nextItem.min : "", 
