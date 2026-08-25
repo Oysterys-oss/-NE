@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     az = PI_VAL * 3 / 2 - a;
                 }
             }
-            return az; // 回傳弳度 (Radians)
+            return az; 
         }
     }
 
@@ -300,8 +300,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 預設帶入第一筆測點 Y254
-    addRow('Y254', '155.193', '289', '57', '48.4');
+    // 預設帶入第一站測點範例（方位角 258.60° 即 258度 36分 00秒）
+    addRow('Y254', '62.1103', '258', '36', '0');
 
     addRowBtn.addEventListener('click', () => addRow());
 
@@ -349,20 +349,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const PI_VAL = Math.PI;
 
         legs.forEach((leg, index) => {
-            // 1. 利用 pol 函數計算後視方向方位角 Az(ST -> BS) [對應 VBA pol 邏輯]
             let azimuthBS = pol(activeStN, activeStE, activeBsN, activeBsE, 2);
-            let azimuthST_BS = azimuthBS; // 設站到後視的方位角
+            let azimuthST_BS = azimuthBS; 
 
-            // 2. 轉換夾角為弳度並與後視方位角相加
             let angleDeg = leg.deg + (leg.min / 60) + (leg.sec / 3600);
             let angleRad = angleDeg * PI_VAL / 180;
             
             let fwdAzRad = azimuthST_BS + angleRad;
-            // 保持在 0 ~ 2*PI 之間
             while (fwdAzRad < 0) fwdAzRad += 2 * PI_VAL;
             while (fwdAzRad >= 2 * PI_VAL) fwdAzRad -= 2 * PI_VAL;
 
-            // 3. 透過正算公式計算 ΔN 與 ΔE
             let dN = leg.dist * Math.cos(fwdAzRad);
             let dE = leg.dist * Math.sin(fwdAzRad);
 
@@ -381,7 +377,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 fwdAz: fwdAzRad * 180 / PI_VAL
             });
 
-            // 4. 滾動更新下一站起算點
             activeBsN = activeStN;
             activeBsE = activeStE;
 
