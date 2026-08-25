@@ -315,10 +315,17 @@ document.addEventListener('DOMContentLoaded', function() {
         rows.forEach((row, idx) => {
             const id = row.querySelector('.input-id').value.trim() || `P${idx+1}`;
             const dist = parseFloat(row.querySelector('.input-dist').value);
-            const deg = parseFloat(row.querySelector('.input-deg').value) || 0;
-            const min = parseFloat(row.querySelector('.input-min').value) || 0;
-            const sec = parseFloat(row.querySelector('.input-sec').value) || 0;
-            tableData.push({ id, dist, deg, min, sec });
+            const deg = parseFloat(row.querySelector('.input-deg').value);
+            const min = parseFloat(row.querySelector('.input-min').value);
+            const sec = parseFloat(row.querySelector('.input-sec').value);
+            
+            tableData.push({ 
+                id, 
+                dist: isNaN(dist) ? "" : dist, 
+                deg: isNaN(deg) ? "" : deg, 
+                min: isNaN(min) ? "" : min, 
+                sec: isNaN(sec) ? "" : sec 
+            });
         });
 
         if (tableData.length === 0) return null;
@@ -329,13 +336,16 @@ document.addEventListener('DOMContentLoaded', function() {
         let calculatedResults = [];
 
         for (let i = 0; i < tableData.length; i++) {
-            const item = tableData[i];
-            const dist = isNaN(item.dist) ? 0 : item.dist;
+            const item = tableData.valueOf()[i]; // or tableData[i]
+            const distVal = typeof item.dist === 'number' ? item.dist : 0;
+            const degVal = typeof item.deg === 'number' ? item.deg : 0;
+            const minVal = typeof item.min === 'number' ? item.min : 0;
+            const secVal = typeof item.sec === 'number' ? item.sec : 0;
 
-            if (dist > 0) {
+            if (distVal > 0) {
                 let azRad = currentAzimuth * (Math.PI / 180);
-                currN += dist * Math.cos(azRad);
-                currE += dist * Math.sin(azRad);
+                currN += distVal * Math.cos(azRad);
+                currE += distVal * Math.sin(azRad);
             }
 
             calculatedResults.push({
@@ -349,7 +359,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             if (i < tableData.length - 1) {
-                let angleDeg = item.deg + (item.min / 60) + (item.sec / 3600);
+                let angleDeg = degVal + (minVal / 60) + (secVal / 3600);
                 currentAzimuth = currentAzimuth + angleDeg;
                 if (currentAzimuth >= 360) currentAzimuth -= 360;
                 let nextBackAz = currentAzimuth + 180;
@@ -365,12 +375,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const data = performCalculation();
         if (!data) return;
 
-        let text = `=== 座標計算結果 (完全對應 Excel 格式) ===\n`;
-        text += `點號: ${data.bsId.padEnd(8)} | 縱座標(N): ${data.bsN} | 橫座標(E): ${data.bsE}\n`;
-        text += `點號: ${data.stId.padEnd(8)} | 縱座標(N): ${data.stN} | 橫座標(E): ${data.stE} (設站點)\n`;
+        let text = `=== 座標計算結果 ===\n`;
+        text += `後視點: ${data.bsId} | N = ${data.bsN}, E = ${data.bsE}\n`;
+        text += `設站點: ${data.stId} | N = ${data.stN}, E = ${data.stE}\n`;
 
         data.results.forEach(r => {
-            text += `點號: ${r.id.padEnd(8)} | 縱座標(N): ${r.n.toFixed(3)} | 橫座標(E): ${r.e.toFixed(3)} | 邊長: ${r.dist || 0}m | 夾角: ${r.deg}°${r.min}'${r.sec}"\n`;
+            text += `目標點: ${r.id} | N = ${r.n.toFixed(3)}, E = ${r.e.toFixed(3)} | 邊長: ${r.dist}m | 夾角: ${r.deg}°${r.min}'${r.sec}"\n`;
         });
 
         resultArea.style.display = 'block';
@@ -382,41 +392,45 @@ document.addEventListener('DOMContentLoaded', function() {
         const data = performCalculation();
         if (!data) return;
 
-        // 建立 Excel 標題列
         const excelRows = [
             ["點號 (ID)", "縱座標 (N)", "橫座標 (E)", "邊長 (m)", "夾角 (度分秒)", "", ""],
             ["", "", "", "", "°", "'", "\""]
         ];
 
-        // 1. 後視點
+        // 1. 後視點 (無邊長與夾角)
         excelRows.push([data.bsId, data.bsN, data.bsE, "", "", "", ""]);
         
-        // 2. 設站點 (將第一筆的邊長與夾角填在設站點這一列)
-        const firstDist = data.results.length > 0 && !isNaN(data.results[0].dist) ? data.results[0].dist : "";
-        const firstAng = data.results.length > 0 ? data.results[0] : null;
-        
+        // 2. 設站點 (把第一筆的邊長與夾角放在這列，代表從設站點出發到第一個前瞻點)
+        const firstItem = data.results.length > 0 ? data.results[0] : null;
         excelRows.push([
             data.stId, 
             Number(data.stN.toFixed(3)), 
-            Number(data.stE.toFixed(3)), 
-            firstDist, 
-            firstAng ? firstAng.deg : "", 
-            firstAng ? firstAng.min : "", 
-            firstAng ? firstAng.sec : ""
+            Number(data.stE.Exports || data.stE.toFixed ? data.stE.toFixed(3) : data.stE), 
+            firstItem ? firstItem.dist : "", 
+            firstItem ? firstItem.deg : "", 
+            firstItem ? firstItem.min : "", 
+            firstItem ? firstItem.sec : ""
         ]);
+        //修正 E 坐標取小數點
+        excelRows[excelRows.length - 1][2] = Number(data.stE.toFixed(3));
 
-        // 3. 依序將所有計算出的前瞻點（包含第一筆 YY19 及後續點）寫入 Excel
-        data.results.forEach(r => {
+        // 3. 前瞻點迴圈 (目標點本身只填點號與計算出的 N、E座標，其本身的邊長夾角留空，除非有多站延伸)
+        for (let i = 0; i < data.results.length; i++) {
+            let r = data.results[i];
+            
+            // 如果還有下一筆，下一筆的邊長夾角應該放在當前點這一列；若是最後一筆則留空
+            let nextItem = (i < data.results.length - 1) ? data.results[i + 1] : null;
+
             excelRows.push([
                 r.id, 
                 Number(r.n.toFixed(3)), 
                 Number(r.e.toFixed(3)), 
-                !isNaN(r.dist) ? r.dist : "", 
-                r.deg !== "" ? r.deg : "", 
-                r.min !== "" ? r.min : "", 
-                r.sec !== "" ? r.sec : ""
+                nextItem ? nextItem.dist : "", 
+                nextItem ? nextItem.deg : "", 
+                nextItem ? nextItem.min : "", 
+                nextItem ? nextItem.sec : ""
             ]);
-        });
+        }
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(excelRows);
