@@ -108,22 +108,23 @@
             border: 1px solid var(--border-color);
             text-align: center;
             font-size: 0.9rem;
+            vertical-align: middle;
         }
 
         th {
-            background-color: #f1f5f9;
+            background-color: #e2e8f0;
             font-weight: 600;
         }
 
         .angle-inputs {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 4px;
-            justify-content: center;
         }
 
         .angle-inputs input {
             text-align: center;
-            padding: 4px;
+            padding: 6px 4px;
         }
 
         .btn-group {
@@ -171,8 +172,8 @@
         .btn-delete {
             background-color: var(--danger-color);
             color: white;
-            padding: 4px 8px;
-            font-size: 0.8rem;
+            padding: 6px 12px;
+            font-size: 0.85rem;
         }
 
         #resultArea {
@@ -223,7 +224,7 @@
             </div>
         </div>
         <div style="font-size: 0.85rem; color: #64748b; margin-top: 5px;">
-            💡 系統會自動透過「後視點 ➔ 設站點」計算出第一段出發方位角与反方位角，並依下方表格的夾角與邊長依序推算前瞻點。
+            💡 系統會自動透過「後視點 ➔ 設站點」計算出第一段出發方位角，並依下方表格的夾角與邊長依序推算前瞻點。
         </div>
     </div>
 
@@ -234,18 +235,18 @@
             <table id="traverseTable">
                 <thead>
                     <tr>
-                        <th style="width: 8%;">項次</th>
-                        <th style="width: 18%;">點號 (ID)</th>
-                        <th style="width: 22%;">邊長 (m)</th>
-                        <th style="width: 40%;">夾角 (度分秒)</th>
-                        <th style="width: 12%;">操作</th>
+                        <th rowspan="2" style="width: 8%;">項次</th>
+                        <th rowspan="2" style="width: 20%;">點號 (ID)</th>
+                        <th rowspan="2" style="width: 22%;">邊長 (m)</th>
+                        <th style="width: 38%;">夾角 (度分秒)</th>
+                        <th rowspan="2" style="width: 12%;">操作</th>
                     </tr>
                     <tr>
-                        <th></th>
-                        <th></th>
-                        <th></th>
-                        <th><span style="font-size:0.8rem">° &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ' &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; "</span></th>
-                        <th></th>
+                        <th style="padding: 4px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 0.8rem; color: #475569;">
+                                <span>度 (°)</span><span>分 (')</span><span>秒 (")</span>
+                            </div>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -306,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 預設帶入對應您圖片的範例資料
+    // 預設帶入範例資料
     addRow('YY19', '1131.947', '205', '29', '47.2');
     addRow('YY21', '', '', '', '');
 
@@ -333,14 +334,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return null;
         }
 
-        // 1. 計算後視點到設站點的方位角 (Az_bs_st)
         let dn = stN - bsN;
         let de = stE - bsE;
         let rad = Math.atan2(de, dn);
         let azBsSt = rad * (180 / Math.PI);
         if (azBsSt < 0) azBsSt += 360;
 
-        // 2. 計算設站點處的回算方位角 (Back Azimuth)
         let backAzimuth = azBsSt + 180;
         if (backAzimuth >= 360) backAzimuth -= 360;
 
@@ -363,12 +362,10 @@ document.addEventListener('DOMContentLoaded', function() {
         let currE = stE;
         let calculatedResults = [];
 
-        // 依序從設站點出發計算後續點
         for (let i = 0; i < tableData.length; i++) {
             const item = tableData[i];
             const dist = isNaN(item.dist) ? 0 : item.dist;
 
-            // 如果有邊長，推算下一個點座標
             if (dist > 0) {
                 let azRad = currentAzimuth * (Math.PI / 180);
                 currN += dist * Math.cos(azRad);
@@ -385,13 +382,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 sec: item.sec
             });
 
-            // 如果還有下一個夾角，計算下一個前進方向的方位角
-            // 新方位角 = 當前回算方位角 + 右角夾角
             if (i < tableData.length - 1) {
                 let angleDeg = item.deg + (item.min / 60) + (item.sec / 3600);
                 currentAzimuth = currentAzimuth + angleDeg;
                 if (currentAzimuth >= 360) currentAzimuth -= 360;
-                // 更新下一個迴圈的回算方位角基礎
                 let nextBackAz = currentAzimuth + 180;
                 if (nextBackAz >= 360) nextBackAz -= 360;
                 currentAzimuth = nextBackAz;
@@ -425,17 +419,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const data = performForwardCalculation();
         if (!data) return;
 
-        // 組合 Excel 格式（符合您先前要求的對齊表頭與排版）
         const excelRows = [
             ["點號 (ID)", "縱座標 (N)", "橫座標 (E)", "邊長 (m)", "夾角 (度分秒)", "", ""],
             ["", "", "", "", "°", "'", "\""]
         ];
 
-        // 放入後視點
         excelRows.push([data.bsId, data.bsN, data.bsE, "", "", "", ""]);
         
-        // 放入設站點（邊長對應至設站點到第一點的距離，此處配合前一題邏輯，設站點列可記錄後視到設站的邊長或留空，這裡將設站點座標列入）
-        // 找出設站點到第一點的邊長
         const firstDist = data.results.length > 0 && data.results[0].dist !== "" ? data.results[0].dist : "";
         const firstAng = data.results.length > 0 ? data.results[0] : null;
         
@@ -449,7 +439,6 @@ document.addEventListener('DOMContentLoaded', function() {
             firstAng ? firstAng.sec : ""
         ]);
 
-        // 放入後續導線點
         for (let i = 1; i < data.results.length; i++) {
             let r = data.results[i];
             excelRows.push([
