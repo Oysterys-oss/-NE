@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>已知夾角與邊長反推座標計算工具</title>
+    <title>設站點與後視點反推座標計算工具</title>
     <!-- 引入 SheetJS 用於前端匯出 Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -191,37 +191,45 @@
 <body>
 
 <div class="container">
-    <h1>已知夾角與邊長反推座標計算工具</h1>
+    <h1>設站點與後視點反推座標計算工具</h1>
 
-    <!-- 起始條件設定 -->
+    <!-- 設站點與後視點條件設定 -->
     <div class="section-box">
-        <h3>📍 1. 起始已知條件</h3>
+        <h3>📍 1. 設站與後視已知條件</h3>
         <div class="grid-2">
             <div class="form-group">
-                <label>起點名稱 (ID):</label>
-                <input type="text" id="startId" value="YY17A">
+                <label>後視點名稱 (ID):</label>
+                <input type="text" id="bsId" value="YY17A">
             </div>
             <div class="form-group">
-                <label>起點縱座標 (N):</label>
-                <input type="number" step="any" id="startN" value="2764584.33">
+                <label>設站點名稱 (ID):</label>
+                <input type="text" id="stId" value="YY18A">
             </div>
             <div class="form-group">
-                <label>起點橫座標 (E):</label>
-                <input type="number" step="any" id="startE" value="306320.654">
+                <label>後視點縱座標 (N):</label>
+                <input type="number" step="any" id="bsN" value="2764584.33">
             </div>
             <div class="form-group">
-                <label>第一段出發方位角 (度): 或用前兩點決定</label>
-                <input type="number" step="any" id="startAzimuth" placeholder="例: 85.5 (度) 或是由下方第二點決定">
+                <label>設站點縱座標 (N):</label>
+                <input type="number" step="any" id="stN" value="2765004.939">
+            </div>
+            <div class="form-group">
+                <label>後視點橫座標 (E):</label>
+                <input type="number" step="any" id="bsE" value="306320.654">
+            </div>
+            <div class="form-group">
+                <label>設站點橫座標 (E):</label>
+                <input type="number" step="any" id="stE" value="307489.7117">
             </div>
         </div>
         <div style="font-size: 0.85rem; color: #64748b; margin-top: 5px;">
-            💡 提示：若您有第二點座標，也可以直接把第二點當作表格的第一列輸入，程式會自動計算第一段方位角與邊長。
+            💡 系統會自動透過「後視點 ➔ 設站點」計算出第一段出發方位角与反方位角，並依下方表格的夾角與邊長依序推算前瞻點。
         </div>
     </div>
 
     <!-- 導線點與夾角輸入表格 -->
     <div class="section-box">
-        <h3>📊 2. 各點資料與夾角輸入（邊長對應至該點）</h3>
+        <h3>📊 2. 前瞻導線點資料與夾角輸入</h3>
         <div class="table-container">
             <table id="traverseTable">
                 <thead>
@@ -270,7 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const newRow = document.createElement('tr');
         newRow.innerHTML = `
             <td class="row-index"></td>
-            <td><input type="text" class="input-id" value="${id}" placeholder="例: YY18A"></td>
+            <td><input type="text" class="input-id" value="${id}" placeholder="例: YY19"></td>
             <td><input type="number" step="any" class="input-dist" value="${dist}" placeholder="邊長(m)"></td>
             <td>
                 <div class="angle-inputs">
@@ -298,8 +306,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 預設填入範例資料
-    addRow('YY18A', '724.459', '149', '12', '57.6');
+    // 預設帶入對應您圖片的範例資料
     addRow('YY19', '1131.947', '205', '29', '47.2');
     addRow('YY21', '', '', '', '');
 
@@ -314,20 +321,30 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function performForwardCalculation() {
-        const startId = document.getElementById('startId').value.trim() || 'P0';
-        const startN = parseFloat(document.getElementById('startN').value);
-        const startE = parseFloat(document.getElementById('startE').value);
+        const bsId = document.getElementById('bsId').value.trim() || 'BS';
+        const stId = document.getElementById('stId').value.trim() || 'ST';
+        const bsN = parseFloat(document.getElementById('bsN').value);
+        const bsE = parseFloat(document.getElementById('bsE').value);
+        const stN = parseFloat(document.getElementById('stN').value);
+        const stE = parseFloat(document.getElementById('stE').value);
 
-        if (isNaN(startN) || isNaN(startE)) {
-            alert('請輸入有效的起點座標 (N, E)！');
+        if (isNaN(bsN) || isNaN(bsE) || isNaN(stN) || isNaN(stE)) {
+            alert('請輸入完整的後視點與設站點座標！');
             return null;
         }
 
-        const rows = tbody.querySelectorAll('tr');
-        let points = [{ id: startId, n: startN, e: startE }];
-        let calculatedResults = [];
+        // 1. 計算後視點到設站點的方位角 (Az_bs_st)
+        let dn = stN - bsN;
+        let de = stE - bsE;
+        let rad = Math.atan2(de, dn);
+        let azBsSt = rad * (180 / Math.PI);
+        if (azBsSt < 0) azBsSt += 360;
 
-        // 收集表格輸入
+        // 2. 計算設站點處的回算方位角 (Back Azimuth)
+        let backAzimuth = azBsSt + 180;
+        if (backAzimuth >= 360) backAzimuth -= 360;
+
+        const rows = tbody.querySelectorAll('tr');
         let tableData = [];
         rows.forEach((row, idx) => {
             const id = row.querySelector('.input-id').value.trim() || `P${idx+1}`;
@@ -341,51 +358,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (tableData.length === 0) return null;
 
-        // 決定第一段方位角
-        let currentAzimuth = 0;
-        let explicitStartAz = parseFloat(document.getElementById('startAzimuth').value);
-        
-        if (!isNaN(explicitStartAz)) {
-            currentAzimuth = explicitStartAz;
-        } else {
-            // 如果沒有填初始方位角，預設假設第一段方向由起點指向第一點的某個方向，或需要初始方向
-            // 實務上一定要有起始邊的方位角 (Azimuth) 才能推算
-            currentAzimuth = 0; 
-        }
+        let currentAzimuth = backAzimuth;
+        let currN = stN;
+        let currE = stE;
+        let calculatedResults = [];
 
-        // 開始依序前進計算
-        let currN = startN;
-        let currE = startE;
-
+        // 依序從設站點出發計算後續點
         for (let i = 0; i < tableData.length; i++) {
             const item = tableData[i];
             const dist = isNaN(item.dist) ? 0 : item.dist;
-            
-            // 計算當前點的座標（如果前一段有邊長與方位角）
-            if (i > 0) {
-                // 從前一點到當前點
-                let rad = currentAzimuth * (Math.PI / 180);
-                currN += dist * Math.cos(rad);
-                currE += dist * Math.sin(rad);
-            } else {
-                // 第一筆資料如果也有邊長，從起點出發
-                if (dist > 0) {
-                    let rad = currentAzimuth * (Math.PI / 180);
-                    currN += dist * Math.cos(rad);
-                    currE += dist * Math.sin(rad);
-                }
+
+            // 如果有邊長，推算下一個點座標
+            if (dist > 0) {
+                let azRad = currentAzimuth * (Math.PI / 180);
+                currN += dist * Math.cos(azRad);
+                currE += dist * Math.sin(azRad);
             }
-
-            points.push({ id: item.id, n: currN, e: currE });
-
-            // 計算下一個方位角 (利用當前點輸入的夾角)
-            // 右角轉動公式: Az_next = Az_prev + 180° + 夾角
-            let angleDeg = item.deg + (item.min / 60) + (item.sec / 3600);
-            let backAzimuth = currentAzimuth + 180;
-            if (backAzimuth >= 360) backAzimuth -= 360;
-
-            currentAzimuth = backAzimuth + angleDeg;
-            if (currentAzimuth >= 360) currentAzimuth -= 360;
 
             calculatedResults.push({
                 id: item.id,
@@ -396,24 +384,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 min: item.min,
                 sec: item.sec
             });
+
+            // 如果還有下一個夾角，計算下一個前進方向的方位角
+            // 新方位角 = 當前回算方位角 + 右角夾角
+            if (i < tableData.length - 1) {
+                let angleDeg = item.deg + (item.min / 60) + (item.sec / 3600);
+                currentAzimuth = currentAzimuth + angleDeg;
+                if (currentAzimuth >= 360) currentAzimuth -= 360;
+                // 更新下一個迴圈的回算方位角基礎
+                let nextBackAz = currentAzimuth + 180;
+                if (nextBackAz >= 360) nextBackAz -= 360;
+                currentAzimuth = nextBackAz;
+            }
         }
 
-        return calculatedResults;
+        return {
+            bsId, stId, bsN, bsE, stN, stE, results: calculatedResults
+        };
     }
 
     calculateBtn.addEventListener('click', function() {
-        const results = performForwardCalculation();
-        if (!results) return;
+        const data = performForwardCalculation();
+        if (!data) return;
 
-        let startId = document.getElementById('startId').value;
-        let startN = document.getElementById('startN').value;
-        let startE = document.getElementById('startE').value;
+        let text = `=== 設站與後視反推計算結果 ===\n`;
+        text += `後視點 ${data.bsId}：N = ${data.bsN}, E = ${data.bsE}\n`;
+        text += `設站點 ${data.stId}：N = ${data.stN}, E = ${data.stE}\n\n`;
 
-        let text = `=== 座標反推計算結果 ===\n`;
-        text += `起點 ${startId}：N = ${startN}, E = ${startE}\n\n`;
-
-        results.forEach(r => {
-            text += `點号: ${r.id} | 邊長: ${r.dist || 0}m | 夾角: ${r.deg}°${r.min}'${r.sec}"\n`;
+        data.results.forEach(r => {
+            text += `目標點: ${r.id} | 邊長: ${r.dist || 0}m | 夾角: ${r.deg}°${r.min}'${r.sec}"\n`;
             text += `  ➔ 推算座標：N = ${r.n.toFixed(3)}, E = ${r.e.toFixed(3)}\n\n`;
         });
 
@@ -423,24 +422,36 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     exportExcelBtn.addEventListener('click', function() {
-        const results = performForwardCalculation();
-        if (!results) return;
+        const data = performForwardCalculation();
+        if (!data) return;
 
-        const startId = document.getElementById('startId').value;
-        const startN = parseFloat(document.getElementById('startN').value);
-        const startE = parseFloat(document.getElementById('startE').value);
-
-        // 組合 Excel 格式（符合您先前要求的對齊表頭）
+        // 組合 Excel 格式（符合您先前要求的對齊表頭與排版）
         const excelRows = [
             ["點號 (ID)", "縱座標 (N)", "橫座標 (E)", "邊長 (m)", "夾角 (度分秒)", "", ""],
             ["", "", "", "", "°", "'", "\""]
         ];
 
-        // 先加入起點
-        excelRows.push([startId, startN, startE, "", "", "", ""]);
+        // 放入後視點
+        excelRows.push([data.bsId, data.bsN, data.bsE, "", "", "", ""]);
+        
+        // 放入設站點（邊長對應至設站點到第一點的距離，此處配合前一題邏輯，設站點列可記錄後視到設站的邊長或留空，這裡將設站點座標列入）
+        // 找出設站點到第一點的邊長
+        const firstDist = data.results.length > 0 && data.results[0].dist !== "" ? data.results[0].dist : "";
+        const firstAng = data.results.length > 0 ? data.results[0] : null;
+        
+        excelRows.push([
+            data.stId, 
+            Number(data.stN.toFixed(3)), 
+            Number(data.stE.toFixed(3)), 
+            firstDist, 
+            firstAng ? firstAng.deg : "", 
+            firstAng ? firstAng.min : "", 
+            firstAng ? firstAng.sec : ""
+        ]);
 
-        // 加入後續各點
-        results.forEach(r => {
+        // 放入後續導線點
+        for (let i = 1; i < data.results.length; i++) {
+            let r = data.results[i];
             excelRows.push([
                 r.id, 
                 Number(r.n.toFixed(3)), 
@@ -450,7 +461,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 r.min !== "" ? r.min : "", 
                 r.sec !== "" ? r.sec : ""
             ]);
-        });
+        }
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(excelRows);
@@ -459,8 +470,8 @@ document.addEventListener('DOMContentLoaded', function() {
             { s: { r: 0, c: 4 }, e: { r: 0, c: 6 } }
         ];
 
-        XLSX.utils.book_append_sheet(wb, ws, "座標反推計算表");
-        XLSX.writeFile(wb, `座標反推計算表_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "設站反推計算表");
+        XLSX.writeFile(wb, `設站反推計算表_${new Date().toISOString().slice(0, 10)}.xlsx`);
     });
 });
 </script>
