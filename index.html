@@ -208,11 +208,11 @@
             </div>
             <div class="form-group">
                 <label>後視點縱座標 (N):</label>
-                <input type="number" step="any" id="bsN" value="2764584.33">
+                <input type="number" step="any" id="bsN" value="2764584">
             </div>
             <div class="form-group">
                 <label>設站點縱座標 (N):</label>
-                <input type="number" step="any" id="stN" value="2765004.939">
+                <input type="number" step="any" id="stN" value="2765005">
             </div>
             <div class="form-group">
                 <label>後視點橫座標 (E):</label>
@@ -220,11 +220,11 @@
             </div>
             <div class="form-group">
                 <label>設站點橫座標 (E):</label>
-                <input type="number" step="any" id="stE" value="307489.7117">
+                <input type="number" step="any" id="stE" value="307489.712">
             </div>
         </div>
         <div style="font-size: 0.85rem; color: #64748b; margin-top: 5px;">
-            💡 系統會自動透過「後視點 ➔ 設站點」計算出第一段出發方位角，並依下方表格的夾角與邊長依序推算前瞻點。
+            💡 系統會自動透過「後視點 ➔ 設站點」計算出第一段出發方位角，並依下方表格的夾角與邊長依序推算前瞻點座標。
         </div>
     </div>
 
@@ -307,9 +307,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 預設帶入範例資料
-    addRow('YY19', '1131.947', '205', '29', '47.2');
-    addRow('YY21', '', '', '', '');
+    // 預帶入您剛剛截圖的範例資料
+    addRow('YY19', '2220', '22', '0', '55');
 
     addRowBtn.addEventListener('click', () => addRow());
 
