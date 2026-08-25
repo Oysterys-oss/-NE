@@ -1,1 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>臨時測量邊長與夾角計算工具</title>
+    <!-- 引入 SheetJS (js-xlsx) 用於前端匯出 Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success-color: #16a34a;
+            --success-hover: #15803d;
+            --danger-color: #dc2626;
+            --danger-hover: #b91c1c;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --border-color: #cbd5e1;
+            --text-color: #1e293b;
+        }
 
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--primary-color);
+            text-align: center;
+        }
+
+        .batch-paste-box {
+            background-color: #f1f5f9;
+            border: 1px dashed var(--border-color);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .batch-paste-box label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            color: #334155;
+        }
+
+        .batch-paste-box textarea {
+            width: 100%;
+            height: 90px;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            background-color: #ffffff;
+        }
+
+        .batch-paste-box textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+        }
+
+        th, td {
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            flex: 2;
+            min-width: 180px;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+            color: white;
+            flex: 1.5;
+            min-width: 150px;
+        }
+
+        .btn-success:hover {
+            background-color: var(--success-hover);
+        }
+
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: var(--text-color);
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #cbd5e1;
+        }
+
+        .btn-danger-outline {
+            background-color: #fff;
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .btn-danger-outline:hover {
+            background-color: #ffeeef;
+        }
+
+        .btn-delete {
+            background-color: var(--danger-color);
+            color: white;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+
+        .btn-delete:hover {
+            background-color: var(--danger-hover);
+        }
+
+        #resultArea {
+            background-color: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--primary-color);
+            padding: 20px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 0.95rem;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>臨時測量邊長與夾角計算工具</h1>
+
+    <div class="batch-paste-box">
+        <label for="batchInput">📋 批次輸入區（可直接手動打字或貼上，欄位間用空白或 Tab 分隔）：</label>
+        <textarea id="batchInput" placeholder="格式範例：點號 縱座標 (N)  橫座標 (E)
+YY17A 2764584.3300 306320.6540
+YY18A 2765004.9392 307489.7117"></textarea>
+        <button type="button" id="importBtn" class="btn-secondary" style="margin-top: 8px; width: 100%;">將上方文字追加至表格下方</button>
+    </div>
+
+    <div class="table-container">
+        <table id="coordTable">
+            <thead>
+                <tr>
+                    <th style="width: 10%;">項次</th>
+                    <th style="width: 25%;">點號 (ID)</th>
+                    <th style="width: 30%;">縱座標 (N)</th>
+                    <th style="width: 30%;">橫座標 (E)</th>
+                    <th style="width: 15%;">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 內容會由 JavaScript 自動載入或初始化 -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="btn-group">
+        <button type="button" id="addRowBtn" class="btn-secondary">＋ 新增導線點</button>
+        <button type="button" id="clearBtn" class="btn-danger-outline">🗑️ 清空全部資料</button>
+        <button type="button" id="calculateBtn" class="btn-primary">計算邊長與夾角</button>
+        <button type="button" id="exportExcelBtn" class="btn-success">📊 匯出 Excel (標準格式)</button>
+    </div>
+
+    <div id="resultArea"></div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tbody = document.querySelector('#coordTable tbody');
+    const addRowBtn = document.getElementById('addRowBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const calculateBtn = document.getElementById('calculateBtn');
+    const exportExcelBtn = document.getElementById('exportExcelBtn');
+    const resultArea = document.getElementById('resultArea');
+    const batchInput = document.getElementById('batchInput');
+    const importBtn = document.getElementById('importBtn');
+
+    function saveData() {
+        const rows = tbody.querySelectorAll('tr');
+        const data = [];
+        rows.forEach(row => {
+            const id = row.querySelector('.input-id').value;
+            const n = row.querySelector('.input-n').value;
+            const e = row.querySelector('.input-e').value;
+            data.push({ id, n, e });
+        });
+        localStorage.setItem('temp_survey_data', JSON.stringify(data));
+    }
+
+    function updateRowIndices() {
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach((row, index) => {
+            const indexCell = row.querySelector('.row-index');
+            if (indexCell) {
+                indexCell.textContent = index + 1;
+            }
+        });
+    }
+
+    function addRow(id = '', n = '', e = '') {
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td class="row-index"></td>
+            <td><input type="text" class="input-id" value="${id}" placeholder="例: P01"></td>
+            <td><input type="number" step="any" class="input-n" value="${n}" placeholder="縱座標(N)"></td>
+            <td><input type="number" step="any" class="input-e" value="${e}" placeholder="橫座標(E)"></td>
+            <td><button type="button" class="btn-delete">刪除</button></td>
+        `;
+
+        newRow.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', saveData);
+        });
+
+        newRow.querySelector('.btn-delete').addEventListener('click', function() {
+            deleteRow(this);
+        });
+
+        tbody.appendChild(newRow);
+        updateRowIndices();
+        saveData();
+        return newRow;
+    }
+
+    function deleteRow(btn) {
+        const row = btn.closest('tr');
+        if (tbody.rows.length > 1) {
+            row.remove();
+            updateRowIndices();
+            saveData();
+        } else {
+            row.querySelector('.input-id').value = '';
+            row.querySelector('.input-n').value = '';
+            row.querySelector('.input-e').value = '';
+            saveData();
+        }
+    }
+
+    function loadSavedData() {
+        const saved = localStorage.getItem('temp_survey_data');
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                if (Array.isArray(data) && data.length > 0) {
+                    tbody.innerHTML = '';
+                    data.forEach(item => {
+                        addRow(item.id, item.n !== undefined ? item.n : '', item.e !== undefined ? item.e : '');
+                    });
+                    return;
+                }
+            } catch (e) {
+                console.error("載入儲存資料失敗", e);
+            }
+        }
+        addRow();
+    }
+
+    loadSavedData();
+
+    addRowBtn.addEventListener('click', function() {
+        addRow();
+    });
+
+    clearBtn.addEventListener('click', function() {
+        if (confirm('確定要清空所有表格資料嗎？')) {
+            localStorage.removeItem('temp_survey_data');
+            tbody.innerHTML = '';
+            addRow();
+            resultArea.style.display = 'none';
+        }
+    });
+
+    importBtn.addEventListener('click', function() {
+        const text = batchInput.value.trim();
+        if (!text) {
+            alert('請先在上方輸入框手動打字或貼上資料！');
+            return;
+        }
+
+        const lines = text.split(/\r?\n/);
+        let importedCount = 0;
+
+        lines.forEach((line) => {
+            if (!line.trim()) return;
+            let cols = line.trim().split(/\s+/);
+            if (cols.length >= 3) {
+                let id = cols[0].trim();
+                let n = cols[1].trim();
+                let e = cols[2].trim();
+
+                const firstRow = tbody.querySelector('tr');
+                const firstId = firstRow ? firstRow.querySelector('.input-id').value.trim() : '';
+                const firstN = firstRow ? firstRow.querySelector('.input-n').value.trim() : '';
+                const firstE = firstRow ? firstRow.querySelector('.input-e').value.trim() : '';
+
+                if (firstRow && !firstId && !firstN && !firstE && importedCount === 0) {
+                    firstRow.querySelector('.input-id').value = id;
+                    firstRow.querySelector('.input-n').value = n;
+                    firstRow.querySelector('.input-e').value = e;
+                } else {
+                    addRow(id, n, e);
+                }
+                importedCount++;
+            }
+        });
+
+        if (importedCount > 0) {
+            updateRowIndices();
+            saveData();
+            alert(`成功追加匯入 ${importedCount} 筆座標資料！`);
+            batchInput.value = '';
+        } else {
+            alert('格式有誤！每行請包含：點號、縱座標(N)、橫座標(E)（欄位之間請用空格或 Tab 隔開）。');
+        }
+    });
+
+    function getSurveyData() {
+        const rows = tbody.querySelectorAll('tr');
+        const coordinates = [];
+
+        rows.forEach((row, idx) => {
+            const idInput = row.querySelector('.input-id');
+            const nInput = row.querySelector('.input-n');
+            const eInput = row.querySelector('.input-e');
+
+            if (idInput && nInput && eInput) {
+                const id = idInput.value.trim() || `P${idx + 1}`;
+                const n = parseFloat(nInput.value);
+                const e = parseFloat(eInput.value);
+
+                if (!isNaN(n) && !isNaN(e)) {
+                    coordinates.push({ id, n, e });
+                }
+            }
+        });
+        return coordinates;
+    }
+
+    function performCalculation() {
+        const coordinates = getSurveyData();
+        if (coordinates.length < 2) return null;
+
+        let azList = [];
+        let distances = [];
+        for (let i = 0; i < coordinates.length - 1; i++) {
+            const p1 = coordinates[i];
+            const p2 = coordinates[i + 1];
+
+            const dn = p2.n - p1.n;
+            const de = p2.e - p1.e;
+            const distance = Math.sqrt(dn * dn + de * de);
+
+            let angleRad = Math.atan2(de, dn);
+            let angleDeg = angleRad * (180 / Math.PI);
+            if (angleDeg < 0) angleDeg += 360;
+
+            azList.push({
+                from: p1.id,
+                to: p2.id,
+                azimuth: angleDeg,
+                distance: distance
+            });
+            distances.push({ from: p1.id, to: p2.id, distance, dn, de });
+        }
+
+        let angles = [];
+        if (azList.length >= 2) {
+            for (let i = 0; i < azList.length - 1; i++) {
+                const prevAz = azList[i].azimuth;     
+                const nextAz = azList[i + 1].azimuth; 
+                const vertexPoint = azList[i].to;     
+
+                let backAz = prevAz + 180;
+                if (backAz >= 360) backAz -= 360;
+
+                let rightAngle = nextAz - backAz;
+                if (rightAngle < 0) rightAngle += 360;
+
+                const deg = Math.floor(rightAngle);
+                const minFloat = (rightAngle - deg) * 60;
+                const min = Math.floor(minFloat);
+                const sec = Number(((minFloat - min) * 60).toFixed(1));
+
+                angles.push({ vertex: vertexPoint, deg, min, sec });
+            }
+        }
+
+        return { coordinates, distances, angles };
+    }
+
+    calculateBtn.addEventListener('click', function() {
+        const data = performCalculation();
+        if (!data || data.coordinates.length < 2) {
+            alert('請至少輸入兩筆有效的座標（包含縱座標與橫座標）才能計算！');
+            return;
+        }
+
+        let resultText = "=== 導線邊長計算 ===\n\n";
+        data.distances.forEach(d => {
+            resultText += `邊長：${d.from} ➔ ${d.to} = ${d.distance.toFixed(3)} 公尺\n`;
+        });
+
+        if (data.angles.length > 0) {
+            resultText += "\n=== 頂點夾角 (右角) 計算 ===\n\n";
+            data.angles.forEach(a => {
+                resultText += `頂點 ${a.vertex} 夾角：${a.deg}° ${a.min}′ ${a.sec}″\n`;
+            });
+        }
+
+        resultArea.style.display = 'block';
+        resultArea.textContent = resultText;
+        resultArea.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    exportExcelBtn.addEventListener('click', function() {
+        const data = performCalculation();
+        if (!data || data.coordinates.length < 2) {
+            alert('請先輸入至少兩筆有效座標，並確保資料正確才能匯出 Excel！');
+            return;
+        }
+
+        // 邊長對應起點 (from)
+        const distMap = {};
+        data.distances.forEach(d => {
+            distMap[d.from] = d.distance;
+        });
+
+        // 夾角對應頂點 (vertex)
+        const angleMap = {};
+        data.angles.forEach(a => {
+            angleMap[a.vertex] = { deg: a.deg, min: a.min, sec: a.sec };
+        });
+
+        const excelRows = [
+            ["點號 (ID)", "縱座標 (N)", "橫座標 (E)", "邊長 (m)", "夾角 (度分秒)", "", ""],
+            ["", "", "", "", "°", "'", "\""]
+        ];
+
+        data.coordinates.forEach(c => {
+            const dist = distMap[c.id] !== undefined ? Number(distMap[c.id].toFixed(3)) : "";
+            const ang = angleMap[c.id];
+            const deg = ang ? ang.deg : "";
+            const min = ang ? ang.min : "";
+            const sec = ang ? ang.sec : "";
+
+            excelRows.push([c.id, c.n, c.e, dist, deg, min, sec]);
+        });
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(excelRows);
+
+        ws['!merges'] = [
+            { s: { r: 0, c: 4 }, e: { r: 0, c: 6 } }
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, "導線計算表");
+
+        const filename = `測量導線計算表_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        XLSX.writeFile(wb, filename);
+    });
+});
+</script>
+
+</body>
+</html>
